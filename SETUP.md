@@ -46,11 +46,15 @@ Only needed if you want `npm run create -- --deploy` to drop new workflows into 
 
 ## 4. Configure `.env`
 
+The easiest way to get started is to **get the `.env` file from Chirag**.
+
+If you have it, simply drop it into the repo root. If not, copy the example:
+
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` in Cursor and fill in:
+Open `.env` in Cursor and fill in (if you didn't get one from Chirag):
 
 ```env
 PIPEDREAM_API_KEY=apn_...
