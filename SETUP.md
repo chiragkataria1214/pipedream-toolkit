@@ -175,20 +175,6 @@ cp claude/skills/pipedream-workflows/SKILL.md ~/.claude/skills/pipedream-workflo
 
 ---
 
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `❌ PIPEDREAM_API_KEY missing` | You didn't copy `.env.example` to `.env`, or the key line is blank. |
-| `❌ PIPEDREAM_ORG_ID missing` | Same — set it in `.env`. |
-| `Project listing succeeded but no workflows could be listed via API` | Pipedream's REST API doesn't always expose per-project workflow listing. Fix by **either**: (a) save a file `my-workflows.txt` containing your workflow ids (anything matching `p_xxx` in any text format) and run `npm run refresh -- --ids my-workflows.txt`, **or** (b) export the workspace tree from the Pipedream UI (Workspace → ⋯ → Export tree as text), save as `pipedream_workflows.txt` in the repo root, and re-run `npm run refresh`. |
-| `⚠️ Could not list projects` | Your API key likely lacks workspace scope. Regenerate at [pipedream.com/settings/api-keys](https://pipedream.com/settings/api-keys) with full access, or use the `--ids` / tree-file fallbacks above. |
-| `Deploy failed (HTTP 4xx)` on `--deploy` | Pipedream's API shape for workflow creation is undocumented in places. Use the **Import from JSON** UI path instead — it always works. |
-| Cursor doesn't pick up the rule | Cursor → Settings → Rules — confirm "Auto-attach" is enabled. Reload the window. Check `.cursor/rules/pipedream-workflows.mdc` exists in the repo root. |
-| Want to start over | `rm -rf exported_workflows && npm run refresh` |
-
----
-
 ## What's NOT in this toolkit (yet)
 
 - A "push edits" command — currently you re-paste `.js` changes into Pipedream UI. Coming soon.
