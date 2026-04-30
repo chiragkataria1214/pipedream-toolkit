@@ -111,7 +111,23 @@ If Cursor produces generic Node.js code instead, the rule isn't being picked up 
 
 ---
 
-## 7. Create a new workflow from the laptop
+## 7. Create a new workflow (AI-assisted)
+
+The fastest way to build a new workflow is to **ask Cursor (or Claude Code)** to do it for you. Since the AI has access to the `pipedream-workflows` rule/skill, it can scaffold the whole structure in seconds.
+
+**Try asking Cursor:**
+> "Create a new HTTP-triggered workflow in the 'Ops' project called 'SheetToSlack' with steps to fetchNewRows and postToSlack."
+
+The AI will:
+1. Run the `npm run create` script to generate the folder and JSON definition.
+2. Inspect existing workflows to match the project's style and patterns.
+3. Write the logic for the generated `.js` files.
+
+---
+
+### Manual Scaffolding (Optional)
+
+If you prefer to run the commands yourself:
 
 ```bash
 npm run create -- \
@@ -129,7 +145,7 @@ exported_workflows/Ops/SheetToSlack/
   postToSlack.js
 ```
 
-Open the `.js` files and fill in the logic (Cursor's pipedream-workflows rule will help). Then deploy one of two ways:
+Open the `.js` files and fill in the logic. Then deploy one of two ways:
 
 **Hands-on (recommended for the first one):**
 1. Open Pipedream UI → **New workflow**
@@ -157,7 +173,7 @@ This POSTs to `/v1/workflows` directly. If the API rejects the payload (4xx), th
 | Started the day, want to pick up overnight UI edits | `npm run refresh` |
 | Only refreshed yesterday, fast incremental | `npm run refresh -- --since $(date -v -1d +%Y-%m-%d)` |
 | Pull a single workflow you're touching right now | `npm run refresh -- --workflow p_abc123` |
-| New workflow, AI-assisted | Ask Cursor → `npm run create -- ... --deploy` |
+| New workflow, AI-assisted | Ask Cursor: "Create a new workflow..." |
 | Edit existing workflow code | Edit the `.js` file in `exported_workflows/<Project>/<Name>/`, then either paste back into Pipedream UI or wait for an automated push (TODO — not built yet) |
 
 ---
