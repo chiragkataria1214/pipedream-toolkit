@@ -150,30 +150,22 @@ async run({ steps, $ }) {
 
 ## Scaffolding a NEW workflow
 
-Use the project's helper:
+**YOU (the AI) should perform this step.** When asked to create a new workflow:
 
-```bash
-npm run create \
-  --project Notion \
-  --name SyncMonthlyChangelog \
-  --trigger timer --cron "0 9 * * 1" \
-  --steps fetchChangelog,formatPage,createNotionPage
-```
+1.  **Run the helper script** in the terminal to scaffold the folder structure and JSON definition:
+    ```bash
+    npm run create -- \
+      --project <ProjectName> \
+      --name <WorkflowName> \
+      --trigger <http|timer|email> \
+      --steps <comma,separated,step,names>
+    ```
+2.  **Inspect existing workflows** in `exported_workflows/` to match the coding style, prop naming, and error handling patterns of the project.
+3.  **Fill in the logic** for the generated `.js` stubs using the `defineComponent` contract described above.
 
-This writes:
-```
-exported_workflows/Notion/SyncMonthlyChangelog/
-  workflow_definition.json   ← skeleton with the right trigger + step list
-  fetchChangelog.js          ← defineComponent stub
-  formatPage.js
-  createNotionPage.js
-```
-
-Then deploy it with one of:
-
-- **Hands-on (recommended):** open Pipedream UI, "Import from JSON", paste `workflow_definition.json`, paste each step's code. Pipedream provisions the trigger URL / cron registration.
-- **Hands-off (API):** `npm run create --deploy …` (calls `POST /v1/workflows` against the workspace). Best for templated bulk creation; the API path is documented inline in the script.
-- **Components only:** if a piece of logic is reusable across workflows, publish it as a Pipedream component first (`pd publish ./components/foo.mjs`) and reference its key from `workflow_definition.json`.
+**Deploying:**
+- **Hands-on:** Instruct the user to open Pipedream UI, "Import from JSON", and paste `workflow_definition.json`.
+- **Hands-off (API):** Add the `--deploy` flag to the `npm run create` command if the user wants immediate deployment.
 
 ## Authoring checklist (run mentally before declaring done)
 
