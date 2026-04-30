@@ -127,11 +127,11 @@ async function exists(p) {
 }
 
 async function scaffold() {
-    if (await exists(projDir) && !FORCE) {
-        console.error(`error: ${projDir} already exists (pass --force to overwrite)`);
-        process.exit(1);
+    if (await exists(projDir)) {
+        console.log(`ℹ️  Directory ${projDir} already exists. Syncing definition and deploying…`);
+    } else {
+        await fs.mkdir(projDir, { recursive: true });
     }
-    await fs.mkdir(projDir, { recursive: true });
 
     const def = buildDefinition();
     await fs.writeFile(
@@ -139,10 +139,12 @@ async function scaffold() {
         JSON.stringify(def, null, 2)
     );
     for (let i = 0; i < STEPS.length; i++) {
-        await fs.writeFile(
-            path.join(projDir, `${STEPS[i]}.js`),
-            FIRST_STEP_TEMPLATE(STEPS[i], i === 0, TRIGGER)
-        );
+        const filePath = path.join(projDir, `${STEPS[i]}.js`);
+        if (!(await exists(filePath)) || FORCE) {
+            await fs.writeFile(filePath, FIRST_STEP_TEMPLATE(STEPS[i], i === 0, TRIGGER));
+        } else {
+            console.log(`  - Skipping ${STEPS[i]}.js (already exists)`);
+        }
     }
 
     console.log(`✓ Scaffolded ${projDir}`);
@@ -198,7 +200,7 @@ async function deploy(def) {
     try {
         let r;
         if (WORKFLOW_ID) {
-            r = await axios.patch(`https://api.pipedream.com/v1/workflows/${WORKFLOW_ID}`, payload, {
+            r = await axios.put(`https://api.pipedream.com/v1/workflows/${WORKFLOW_ID}?org_id=${ORG_ID}`, payload, {
                 headers: { Authorization: `Bearer ${API_KEY}` },
             });
         } else {
