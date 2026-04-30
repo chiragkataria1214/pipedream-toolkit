@@ -91,57 +91,12 @@ async function listAllWorkflows() {
         return await listFromIdsFile(IDS_FILE);
     }
 
-    // 0. Try GET /workflows?org_id=… first — undocumented in some places
-    //    but referenced in user-facing API guides. Paginates with `page`.
-    const direct = await tryDirectWorkflowsList();
-    if (direct && direct.length) return direct;
-
     // 1. Try tree.spec.json — the project's source of truth for folder mapping.
     const spec = await trySpecFile();
     if (spec && spec.length) return spec;
 
-    let projects = [];
-    try {
-        const { data } = await api.get(`/workspaces/${ORG_ID}/projects`);
-        projects = data.data || data.projects || data;
-        if (!Array.isArray(projects)) throw new Error("unexpected projects shape");
-        console.log(`📂 Found ${projects.length} projects`);
-    } catch (e) {
-        console.warn(`⚠️  Could not list projects: ${e.response?.status || e.message}`);
-        return await tryTreeFile();
-    }
-
-    const all = [];
-    let perProjectFails = 0;
-    for (const proj of projects) {
-        const projId = proj.id || proj.project_id;
-        const projName = sanitize(proj.name || projId);
-        const wfs = await tryListProjectWorkflows(projId);
-        if (!wfs) {
-            perProjectFails++;
-            continue;
-        }
-        for (const wf of wfs) {
-            if (SINCE && wf.updated_at && new Date(wf.updated_at) < new Date(SINCE)) continue;
-            all.push({
-                id: wf.id,
-                name: wf.name || wf.id,
-                folderPath: projName,
-                updated_at: wf.updated_at || null,
-            });
-        }
-        await sleep(RATE_DELAY_MS);
-    }
-
-    if (all.length === 0) {
-        console.warn(
-            `⚠️  Project listing succeeded but no workflows could be listed via API ` +
-            `(${perProjectFails}/${projects.length} per-project listings failed). ` +
-            `Trying tree-file fallback…`
-        );
-        return await tryTreeFile();
-    }
-    return all;
+    // Fallback to legacy tree file
+    return await tryTreeFile();
 }
 
 /**
@@ -195,86 +150,6 @@ async function trySpecFile() {
     } catch {
         return null;
     }
-}
-
-/**
- * Try `GET /workflows?org_id=…&limit=…&page=…`. This endpoint is referenced
- * in some Pipedream API guides as the way to list every workflow visible to
- * the API key. It is not in the official `/docs/rest-api/api-reference/`
- * index, so it may 404 on some accounts — caller falls through.
- *
- * Returns null on any error, [] if the endpoint exists but yields nothing,
- * or [{ id, name, folderPath, updated_at }, …] on success.
- */
-async function tryDirectWorkflowsList() {
-    const all = [];
-    let page = 1;
-    const limit = 100;
-    while (true) {
-        try {
-            const { data } = await api.get(`/workflows`, {
-                params: { org_id: ORG_ID, limit, page },
-            });
-            const wfs =
-                data.data ||
-                data.workflows ||
-                (Array.isArray(data) ? data : null);
-            if (!Array.isArray(wfs)) return null;       // shape unexpected
-            for (const wf of wfs) {
-                if (SINCE && wf.updated_at && new Date(wf.updated_at) < new Date(SINCE)) continue;
-                all.push({
-                    id: wf.id,
-                    name: wf.name || wf.id,
-                    // Pipedream returns project_id and sometimes project_name
-                    folderPath: sanitize(wf.project_name || wf.project?.name || wf.project_id || ""),
-                    updated_at: wf.updated_at || null,
-                });
-            }
-            // Stop when the page is short or pagination metadata says we're done.
-            const pageInfo = data.page_info || data.pagination || null;
-            if (wfs.length < limit) break;
-            if (pageInfo && (pageInfo.has_more === false || pageInfo.next_page === null)) break;
-            if (page >= 50) break;                      // hard ceiling
-            page++;
-            await sleep(RATE_DELAY_MS);
-        } catch (e) {
-            const status = e.response?.status;
-            if (page === 1) {
-                return null;
-            }
-            console.warn(`⚠️  Pagination stopped at page ${page} (${status || e.message}). Returning ${all.length} so far.`);
-            break;
-        }
-    }
-    if (all.length) console.log(`📋 Listed ${all.length} workflows via GET /workflows`);
-    return all;
-}
-
-/**
- * Try several known per-project listing endpoints. Returns the first array
- * we get, or null if all fail.
- */
-async function tryListProjectWorkflows(projId) {
-    const candidates = [
-        `/projects/${projId}/workflows`,
-        `/workspaces/${ORG_ID}/workflows?project_id=${projId}`,
-        `/workspaces/${ORG_ID}/projects/${projId}/workflows`,
-        `/projects/${projId}`,    // sometimes returns { workflows: [...] } embedded
-    ];
-    for (const url of candidates) {
-        try {
-            const { data } = await api.get(url);
-            const wfs =
-                data.workflows ||
-                data.data?.workflows ||
-                data.data ||
-                (Array.isArray(data) ? data : null);
-            if (Array.isArray(wfs)) return wfs;
-        } catch {
-            // try next
-        }
-    }
-    return null;
 }
 
 async function listFromIdsFile(file) {
