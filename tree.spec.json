@@ -36,7 +36,85 @@
     "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/create-timedoctor-tasks-when-notion-card-is-created-p_OKCx7lr/inspect",
     "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/return-td-token-p_gYC5R5d/inspect"
   ],
-  "5 Automation for HR - Hiring": [],
+  "5 Automation for HR - Hiring": {
+    "_root": [
+      "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/mirror-newjob-posts-in-offers-database-p_7NCRM6k/inspect",
+      "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/common-archiveduplicatecandidateapplicationsfromnotion-p_95Cd1YR/inspect",
+      "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/common-autoupdatecanadiancandidatesapplicationsstatustodeniedinnotionsendrejectionmailforalljobidexceptsales-p_3nCqbVm/inspect",
+      "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/common-setnewapplicationstoscreeningstatus-p_5VC6WwG/inspect"
+    ],
+    "Hiring Automations for All Job Posts": {
+      "Account Manager(214)": [
+        "01-Screening (p_MOCNYDR)",
+        "02-video-questions (p_ljC9Zr2)",
+        "03-ai-analysis (p_6lCry26)",
+        "04-updateNotionAndSlackNotification (p_7NCbKYQ)"
+      ],
+      "E-commerce Copy writer (213)": [
+        "01-initial-test-assignment (p_A2C795Z)",
+        "02-test-start-module-delivery (p_PACjYGd)",
+        "03-test-completion-notification (p_RRC8R9p)",
+        "ee (p_jmCmZQy)",
+        "final notification (p_dDCv65d)"
+      ],
+      "E-commerce Research Analyst (212)": [
+        "01-initial-test-assignment (p_WxCVBkZ)",
+        "02-test-start-module-delivery (p_LQCv5qK)",
+        "03-test-completion-notification (p_MOCKOJV)",
+        "sendupdatedemail (p_n1CRD9m)"
+      ],
+      "GROWTH Strategist": [
+        "01-initial-test-assignment (p_QPCMvG1)",
+        "02-test-start-module-delivery (p_MOCKynz)",
+        "03-test-completion-notification (p_A2C7nVx)"
+      ],
+      "Graphic Designer": [
+        "01-initial-test-assignment (p_ZJCaMaY)",
+        "02-test-start-module-delivery (p_MOCKxKx)",
+        "03-test-completion-notification (p_n1CRWR8)"
+      ],
+      "Mid-level UI Designer(789) - Fresh Graduate Designer(888) - Web UI Designer(370)": [
+        "01-sendQuestionaireEmails (p_A2CGvZ1)",
+        "03-Start-Complete-Test-sendTestEmails (p_2gC7dxj)",
+        "Copy of 02-sendTestEmails (p_ljCvkW2)",
+        "autoUpdateCanadianCandidatesApplicationsStatusToDeniedInNotion (p_BjCjRWJ)",
+        "eliminateCandidatesIfElapsedTimelimitorNotStartedTestwithin30Days (p_NMCN29k)",
+        "old-02-sendTestEmails (p_rvC8Rw7)"
+      ],
+      "QualityAssurance(111) QualityInspector(686)": [
+        "Copy of 01-initial-test-assignment (p_gYCw1OB)",
+        "Copy of 02-test-start-module-delivery (p_OKCd5jq)",
+        "Copy of 03-test-completion-notification (p_95CN5G2)"
+      ],
+      "SEO": [
+        "Copy of 01-initial-test-assignment (p_KwCzbnd)",
+        "Copy of 02-test-start-module-delivery (p_KwCzbb6)",
+        "Copy of 03-test-completion-notification (p_QPCMVVM)"
+      ],
+      "Senior CRO Strategist": [
+        "01-initial-test-assignment (p_7NCJd6r)",
+        "02-test-start-module-delivery (p_PACjZ7G)",
+        "03-test-completion-notification (p_JZCe3Qn)"
+      ],
+      "ShopifyFrontEndDeveloper(48) FrontEndDeveloper-LinkedInFastTrack(651) FreshGraduateUIDeveloper(566)": [
+        "00-eliminationProcess (p_6lCoLGx)",
+        "01-sendTestEmails (p_k2CJVan)",
+        "02-testGorillaResultFetchAndUpdatePassedCandidate (p_mkCg99e)",
+        "03-checkGorillaPassedSheetUpdateCandidateNotionStatus (p_6lCoLgY)",
+        "04-startTheTestFormSubmission (p_KwCmqBG)",
+        "05-alertOnSlackForTestCompletionFormSubmision (p_o7CL35m)",
+        "ReminderEmails - Complete Test (p_JZCVjbm)",
+        "ReminderEmails - Send Hold Hiring mail (p_QPC9elz)",
+        "ReminderEmails - Start Test (p_13CVB1R)"
+      ]
+    },
+    "Mind Body Green": [
+      "2step - step2-run-pagespeed-tests (p_o7C1gOn)",
+      "step1-fetch-page-configs (p_KwC76Bn)",
+      "step2-run-pagespeed-tests (p_95Cx5kk)",
+      "step3-write-to-sheets (p_ezC2Wre)"
+    ]
+  },
   "6 Automation for QI": [],
   "7 Automations For AM": [],
   "8 Leave Tracker": [],
