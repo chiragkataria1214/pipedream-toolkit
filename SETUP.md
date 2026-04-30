@@ -125,48 +125,25 @@ The AI will:
 
 ---
 
-### Manual Scaffolding (Optional)
+## 8. Deployment
 
-If you prefer to run the commands yourself:
+Once the workflow is created locally, you have two ways to push it to Pipedream:
 
-```bash
-npm run create -- \
-  --project Ops \
-  --name SheetToSlack \
-  --trigger timer --cron "*/5 * * * *" \
-  --steps fetchNewRows,postToSlack
-```
-
-This writes:
-```
-exported_workflows/Ops/SheetToSlack/
-  workflow_definition.json
-  fetchNewRows.js
-  postToSlack.js
-```
-
-Open the `.js` files and fill in the logic. Then deploy one of two ways:
-
-**Hands-on (recommended for the first one):**
+### Method A: Manual Import (Recommended for fine-tuning)
 1. Open Pipedream UI → **New workflow**
 2. Click the `⋯` menu → **Import from JSON**
-3. Paste the contents of `workflow_definition.json`
-4. Pipedream provisions the trigger URL/cron and you can fine-tune in the UI.
+3. Paste the contents of `workflow_definition.json` (found in the new workflow folder).
+4. Pipedream provisions the trigger and you can then paste your `.js` code into the cells.
 
-**Hands-off (after you trust the toolkit):**
-```bash
-npm run create -- \
-  --project Ops --name SheetToSlack \
-  --trigger timer --cron "*/5 * * * *" \
-  --steps fetchNewRows,postToSlack \
-  --deploy
-```
+### Method B: Automated Push (API)
+Ask Cursor to deploy it for you:
+> "Deploy the SheetToSlack workflow to Pipedream."
 
-This POSTs to `/v1/workflows` directly. If the API rejects the payload (4xx), the script tells you to fall back to the import-from-JSON path.
+It will run `npm run create ... --deploy` which POSTs directly to the Pipedream API.
 
 ---
 
-## 8. Day-to-day
+## 9. Day-to-day
 
 | Situation | Command |
 |---|---|
