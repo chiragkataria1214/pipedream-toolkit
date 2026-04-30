@@ -15,7 +15,7 @@ A 10-minute walkthrough for getting `pipedream-toolkit` running on your laptop. 
 ## 2. Clone the repo
 
 ```bash
-git clone https://github.com/apoorva-01/pipedream-toolkit.git
+git clone https://github.com/chiragkataria1214/pipedream-toolkit.git
 cd pipedream-toolkit
 npm install
 ```
