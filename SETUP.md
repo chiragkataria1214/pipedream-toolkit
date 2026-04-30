@@ -137,9 +137,9 @@ Once the workflow is created locally, you have two ways to push it to Pipedream:
 
 ### Method B: Automated Push (API)
 Ask Cursor to deploy it for you:
-> "Deploy the SheetToSlack workflow to Pipedream."
+> "Deploy this workflow to Pipedream."
 
-It will run `npm run create ... --deploy` which POSTs directly to the Pipedream API.
+The AI will ask you for the **Pipedream workflow link** (e.g., from your browser). Once you provide it, the AI will extract the ID and run the deployment script for you.
 
 ---
 

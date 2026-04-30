@@ -24,6 +24,7 @@
  *   --cron      <string>    Required when --trigger=timer.
  *   --steps     <csv>       Comma-separated step names (declared in order).
  *   --deploy                POST the workflow to /v1/workflows in the workspace.
+ *   --workflow  <id>        Optional: update an existing workflow instead of creating a new one.
  *   --base      <dir>       Output base dir (default: ./exported_workflows).
  *   --force                 Overwrite an existing workflow folder.
  *
@@ -56,6 +57,7 @@ const CRON = flag("cron");
 const STEPS = (flag("steps") || "").split(",").map((s) => s.trim()).filter(Boolean);
 const BASE = flag("base") || process.env.EXPORT_DIR || "exported_workflows";
 const DEPLOY = has("deploy");
+const WORKFLOW_ID = flag("workflow");
 const FORCE = has("force");
 
 if (!PROJECT || !NAME || !STEPS.length) {
@@ -192,14 +194,21 @@ async function deploy(def) {
         workflow: { name: def.name, triggers: def.triggers, steps: stepsWithCode },
     };
 
-    console.log("\n⬆️  Deploying to Pipedream…");
+    console.log(`\n⬆️  Deploying to Pipedream${WORKFLOW_ID ? ` (updating ${WORKFLOW_ID})` : ""}…`);
     try {
-        const r = await axios.post("https://api.pipedream.com/v1/workflows", payload, {
-            headers: { Authorization: `Bearer ${API_KEY}` },
-        });
+        let r;
+        if (WORKFLOW_ID) {
+            r = await axios.patch(`https://api.pipedream.com/v1/workflows/${WORKFLOW_ID}`, payload, {
+                headers: { Authorization: `Bearer ${API_KEY}` },
+            });
+        } else {
+            r = await axios.post("https://api.pipedream.com/v1/workflows", payload, {
+                headers: { Authorization: `Bearer ${API_KEY}` },
+            });
+        }
         const wf = r.data?.workflow || r.data;
-        console.log(`✓ Created workflow ${wf.id || "(no id returned)"}`);
-        if (wf.id) console.log(`  https://pipedream.com/@/${wf.id}`);
+        console.log(`✓ ${WORKFLOW_ID ? "Updated" : "Created"} workflow ${wf.id || WORKFLOW_ID || "(no id returned)"}`);
+        if (wf.id || WORKFLOW_ID) console.log(`  https://pipedream.com/@/${wf.id || WORKFLOW_ID}`);
     } catch (e) {
         const status = e.response?.status;
         const body = e.response?.data;
