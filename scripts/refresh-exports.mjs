@@ -18,6 +18,7 @@
  *   node refresh_exports.js                 # full refresh
  *   node refresh_exports.js --since 2026-04-01
  *   node refresh_exports.js --workflow p_abc123
+ *   node refresh_exports.js --ids my-workflow-ids.txt   # one p_xxx per line
  *
  * Env (loaded from ./.env):
  *   PIPEDREAM_API_KEY   — required (https://pipedream.com/settings/api-keys)
@@ -46,6 +47,7 @@ const flag = (name) => {
 
 const SINCE = flag("since");
 const ONLY_ID = flag("workflow");
+const IDS_FILE = flag("ids");
 const DRY_RUN = argv.includes("--dry-run");
 
 if (!API_KEY) {
@@ -68,61 +70,148 @@ const sanitize = (s) =>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * List every workflow in the workspace by walking projects.
+ * List every workflow in the workspace.
  * Returns [{ id, name, folderPath, updated_at }].
  *
- * Pipedream's API exposes:
- *   GET /workspaces/{orgId}/projects        — list projects
- *   GET /workspaces/{orgId}/sources         — sources (event sources)
- *   GET /projects/{projectId}/workflows     — workflows in a project
- *   GET /workflows/{id}                     — full workflow detail
+ * Pipedream's REST API does not expose a single "list every workflow"
+ * endpoint publicly. We try, in order:
  *
- * If the workspace listing endpoint isn't enabled on this account, falls
- * back to parsing the legacy tree file so the script still works.
+ *   1. --ids <file>                                  — explicit list of p_xxx ids
+ *   2. GET /workspaces/{org}/projects + per-project list
+ *      (tries several path variants, since the per-project shape varies
+ *       across plans / API versions)
+ *   3. Tree file fallback (`pipedream_workflows.txt` or legacy variants).
+ *      Get this by exporting the workspace tree from the Pipedream UI
+ *      (Workspace → ⋯ → Export tree as text), then save it next to this script.
+ *
+ * If all three fail, exits with an actionable error.
  */
 async function listAllWorkflows() {
+    if (IDS_FILE) {
+        return await listFromIdsFile(IDS_FILE);
+    }
+
+    let projects = [];
     try {
         const { data } = await api.get(`/workspaces/${ORG_ID}/projects`);
-        const projects = data.data || data.projects || data;
+        projects = data.data || data.projects || data;
         if (!Array.isArray(projects)) throw new Error("unexpected projects shape");
         console.log(`📂 Found ${projects.length} projects`);
-
-        const all = [];
-        for (const proj of projects) {
-            const projId = proj.id || proj.project_id;
-            const projName = sanitize(proj.name || projId);
-            const { data: wfData } = await api.get(`/projects/${projId}/workflows`);
-            const wfs = wfData.data || wfData.workflows || wfData;
-            for (const wf of wfs) {
-                if (SINCE && wf.updated_at && new Date(wf.updated_at) < new Date(SINCE)) continue;
-                all.push({
-                    id: wf.id,
-                    name: wf.name || wf.id,
-                    folderPath: projName,   // top-level project folder
-                    updated_at: wf.updated_at || null,
-                });
-            }
-            await sleep(RATE_DELAY_MS);
-        }
-        return all;
     } catch (e) {
-        console.warn(
-            `⚠️  workspace listing failed (${e.response?.status || e.message}). ` +
-            `Falling back to ./pipedream_workflows (1).txt tree.`
-        );
-        return await listFromTreeFile();
+        console.warn(`⚠️  Could not list projects: ${e.response?.status || e.message}`);
+        return await tryTreeFile();
     }
+
+    const all = [];
+    let perProjectFails = 0;
+    for (const proj of projects) {
+        const projId = proj.id || proj.project_id;
+        const projName = sanitize(proj.name || projId);
+        const wfs = await tryListProjectWorkflows(projId);
+        if (!wfs) {
+            perProjectFails++;
+            continue;
+        }
+        for (const wf of wfs) {
+            if (SINCE && wf.updated_at && new Date(wf.updated_at) < new Date(SINCE)) continue;
+            all.push({
+                id: wf.id,
+                name: wf.name || wf.id,
+                folderPath: projName,
+                updated_at: wf.updated_at || null,
+            });
+        }
+        await sleep(RATE_DELAY_MS);
+    }
+
+    if (all.length === 0) {
+        console.warn(
+            `⚠️  Project listing succeeded but no workflows could be listed via API ` +
+            `(${perProjectFails}/${projects.length} per-project listings failed). ` +
+            `Trying tree-file fallback…`
+        );
+        return await tryTreeFile();
+    }
+    return all;
 }
 
-async function listFromTreeFile() {
-    const TREE = "pipedream_workflows (1).txt";
+/**
+ * Try several known per-project listing endpoints. Returns the first array
+ * we get, or null if all fail.
+ */
+async function tryListProjectWorkflows(projId) {
+    const candidates = [
+        `/projects/${projId}/workflows`,
+        `/workspaces/${ORG_ID}/workflows?project_id=${projId}`,
+        `/workspaces/${ORG_ID}/projects/${projId}/workflows`,
+        `/projects/${projId}`,    // sometimes returns { workflows: [...] } embedded
+    ];
+    for (const url of candidates) {
+        try {
+            const { data } = await api.get(url);
+            const wfs =
+                data.workflows ||
+                data.data?.workflows ||
+                data.data ||
+                (Array.isArray(data) ? data : null);
+            if (Array.isArray(wfs)) return wfs;
+        } catch {
+            // try next
+        }
+    }
+    return null;
+}
+
+async function listFromIdsFile(file) {
     let text;
     try {
-        text = await fs.readFile(TREE, "utf8");
+        text = await fs.readFile(file, "utf8");
     } catch {
-        console.error(`❌ Neither API listing nor ${TREE} are available.`);
+        console.error(`❌ ${file} not readable`);
         process.exit(2);
     }
+    const ids = [...text.matchAll(/p_[A-Za-z0-9]+/g)].map((m) => m[0]);
+    const unique = [...new Set(ids)];
+    console.log(`📋 Read ${unique.length} workflow ids from ${file}`);
+    return unique.map((id) => ({ id, name: id, folderPath: "", updated_at: null }));
+}
+
+async function tryTreeFile() {
+    const candidates = [
+        "pipedream_workflows.txt",
+        "pipedream_workflows (1).txt",
+        "workflow_tree.txt",
+    ];
+    let TREE = null, text = null;
+    for (const c of candidates) {
+        try {
+            text = await fs.readFile(c, "utf8");
+            TREE = c;
+            break;
+        } catch { /* next */ }
+    }
+    if (!text) {
+        console.error("");
+        console.error("❌ Could not list workflows. None of the fallbacks are available.");
+        console.error("");
+        console.error("Pipedream's REST API does not always expose a workflow-listing endpoint.");
+        console.error("Pick one of these to proceed:");
+        console.error("");
+        console.error("  A) Get the workflow ids and put them in a file (one p_xxx per line):");
+        console.error("       npm run refresh -- --ids my-workflows.txt");
+        console.error("     You can copy ids from the URL of each workflow in Pipedream UI,");
+        console.error("     or paste any text containing p_xxx ids — anything matching /p_[A-Za-z0-9]+/.");
+        console.error("");
+        console.error("  B) Export the workspace tree from Pipedream UI as text and save");
+        console.error("     it as `pipedream_workflows.txt` in the repo root. The script");
+        console.error("     will parse it automatically.");
+        console.error("");
+        console.error("  C) Refresh a single known workflow:");
+        console.error("       npm run refresh -- --workflow p_abc123");
+        console.error("");
+        process.exit(2);
+    }
+    console.log(`📄 Using tree file ${TREE}`);
     const out = [];
     const stack = [];
     for (const raw of text.split("\n")) {
