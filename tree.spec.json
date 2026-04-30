@@ -78,8 +78,7 @@
         "03-Start-Complete-Test-sendTestEmails (p_2gC7dxj)",
         "Copy of 02-sendTestEmails (p_ljCvkW2)",
         "autoUpdateCanadianCandidatesApplicationsStatusToDeniedInNotion (p_BjCjRWJ)",
-        "eliminateCandidatesIfElapsedTimelimitorNotStartedTestwithin30Days (p_NMCN29k)",
-        "old-02-sendTestEmails (p_rvC8Rw7)"
+        "eliminateCandidatesIfElapsedTimelimitorNotStartedTestwithin30Days (p_NMCN29k)"
       ],
       "QualityAssurance(111) QualityInspector(686)": [
         "Copy of 01-initial-test-assignment (p_gYCw1OB)",
@@ -110,9 +109,7 @@
     },
     "Mind Body Green": [
       "2step - step2-run-pagespeed-tests (p_o7C1gOn)",
-      "step1-fetch-page-configs (p_KwC76Bn)",
-      "step2-run-pagespeed-tests (p_95Cx5kk)",
-      "step3-write-to-sheets (p_ezC2Wre)"
+      "step1-fetch-page-configs (p_KwC76Bn)"
     ]
   },
   "6 Automation for QI": [],
