@@ -96,6 +96,10 @@ async function listAllWorkflows() {
     const direct = await tryDirectWorkflowsList();
     if (direct && direct.length) return direct;
 
+    // 1. Try tree.spec.json — the project's source of truth for folder mapping.
+    const spec = await trySpecFile();
+    if (spec && spec.length) return spec;
+
     let projects = [];
     try {
         const { data } = await api.get(`/workspaces/${ORG_ID}/projects`);
@@ -138,6 +142,59 @@ async function listAllWorkflows() {
         return await tryTreeFile();
     }
     return all;
+}
+
+/**
+ * Try parsing tree.spec.json directly.
+ */
+async function trySpecFile() {
+    try {
+        const text = await fs.readFile("tree.spec.json", "utf8");
+        const spec = JSON.parse(text);
+        const all = [];
+
+        const slug2name = (slug) => slug.replace(/[-_]+/g, " ").trim();
+        const parseEntry = (entry) => {
+            const lit = entry.match(/^(.+?)\s*\((p_[A-Za-z0-9]+)\)\s*$/);
+            if (lit) return { id: lit[2], name: lit[1].trim() };
+            const ids = entry.match(/p_[A-Za-z0-9]+/g);
+            if (!ids) return null;
+            const id = ids[ids.length - 1];
+            const slugMatch = entry.match(new RegExp(`/([^/]*${id})/?(?:inspect)?/?$`));
+            const slug = slugMatch ? slugMatch[1].replace(new RegExp(`[-_]?${id}$`), "") : id;
+            return { id, name: slug2name(slug) || id };
+        };
+
+        const walk = (node, pathSegments = []) => {
+            if (Array.isArray(node)) {
+                for (const entry of node) {
+                    const wf = parseEntry(entry);
+                    if (wf) {
+                        all.push({
+                            id: wf.id,
+                            name: wf.name,
+                            folderPath: pathSegments.join("/"),
+                            updated_at: null,
+                        });
+                    }
+                }
+            } else if (node && typeof node === "object") {
+                for (const [key, val] of Object.entries(node)) {
+                    if (key === "_root") {
+                        walk(val, pathSegments);
+                    } else {
+                        walk(val, [...pathSegments, sanitize(key)]);
+                    }
+                }
+            }
+        };
+
+        walk(spec);
+        if (all.length) console.log(`📄 Using tree.spec.json (${all.length} workflows)`);
+        return all;
+    } catch {
+        return null;
+    }
 }
 
 /**
