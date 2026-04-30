@@ -23,6 +23,7 @@ pipedream-toolkit/
 | `npm run refresh -- --since 2026-04-01` | Incremental refresh — only workflows updated after the cutoff. |
 | `npm run refresh -- --workflow p_abc123` | Refresh one workflow. |
 | `npm run create -- --project P --name N --steps a,b,c [--trigger http\|timer --cron "..."] [--deploy]` | Scaffold a new workflow folder with `defineComponent` stubs. Add `--deploy` to push to Pipedream via API. |
+| `npm run build-tree` | Read `tree.spec.json` (folder name → list of workflow inspect URLs) and emit `pipedream_workflows.txt` in the format the refresher expects. Use this when you can't get the UI's "Export tree as text" download. |
 
 ## Editor integration
 

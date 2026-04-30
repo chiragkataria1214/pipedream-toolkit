@@ -10,7 +10,8 @@
   "scripts": {
     "refresh": "node scripts/refresh-exports.mjs",
     "refresh:dry": "node scripts/refresh-exports.mjs --dry-run",
-    "create": "node scripts/create-workflow.mjs"
+    "create": "node scripts/create-workflow.mjs",
+    "build-tree": "node scripts/build-tree.mjs"
   },
   "dependencies": {
     "axios": "^1.7.0",
