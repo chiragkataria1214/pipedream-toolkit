@@ -240,7 +240,6 @@ async function tryDirectWorkflowsList() {
         } catch (e) {
             const status = e.response?.status;
             if (page === 1) {
-                console.warn(`ℹ️  GET /workflows?org_id=… returned ${status || e.message} — trying per-project endpoints…`);
                 return null;
             }
             console.warn(`⚠️  Pagination stopped at page ${page} (${status || e.message}). Returning ${all.length} so far.`);
