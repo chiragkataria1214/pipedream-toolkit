@@ -25,9 +25,17 @@
     "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/cro_project_type_selector-p_rvC7WDw/inspect",
     "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/client-portal-ab-test-launch-p_G6C8JBQ/inspect"
   ],
-  "2 Slack": [],
+  "2 Slack": [
+    "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/pandadoc-p_xMCZPa7/inspect",
+    "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/notifyfirefliessalesrecapchannelonnewgooglesheetentry-p_n1CqzDp/inspect",
+    "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/slackchanneltopicandtotalhoursupdatev2-p_8rCz6ZQ/inspect"
+  ],
   "3 Tobi": [],
-  "4 Time Doctor": [],
+  "4 Time Doctor": [
+    "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/automate-refresh-timedoctor-authtoken-monthly-p_QPCbVd1/inspect",
+    "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/create-timedoctor-tasks-when-notion-card-is-created-p_OKCx7lr/inspect",
+    "https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/return-td-token-p_gYC5R5d/inspect"
+  ],
   "5 Automation for HR - Hiring": [],
   "6 Automation for QI": [],
   "7 Automations For AM": [],
