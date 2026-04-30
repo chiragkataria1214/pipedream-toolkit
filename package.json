@@ -1,0 +1,20 @@
+{
+  "name": "pipedream-toolkit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Laptop-only toolkit for Pipedream workflows: refresh local exports, scaffold new workflows, and deploy via API. Works with Cursor (.cursor/rules) and Claude Code (claude/skills).",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "refresh": "node scripts/refresh-exports.mjs",
+    "refresh:dry": "node scripts/refresh-exports.mjs --dry-run",
+    "create": "node scripts/create-workflow.mjs"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.5"
+  },
+  "license": "MIT"
+}

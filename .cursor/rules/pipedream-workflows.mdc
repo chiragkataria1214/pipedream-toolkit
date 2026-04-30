@@ -1,0 +1,202 @@
+---
+description: Authoring guide for Pipedream workflows — on-disk shape, defineComponent contract, $ helper, trigger types, deploy paths. Auto-attached when editing files under exported_workflows/ or the scripts.
+globs: exported_workflows/**/*.{js,mjs,py,json},scripts/{refresh-exports,create-workflow}.mjs
+alwaysApply: false
+---
+
+# Pipedream workflow authoring
+
+## When this applies
+
+Trigger on any of:
+
+- "create a new Pipedream workflow"
+- "port / clone / refactor a workflow under `exported_workflows/`"
+- "add a step to workflow X"
+- "scaffold a workflow that does Y"
+- the user mentions a `p_xxx` workflow id, `defineComponent`, `steps.foo.$return_value`, `$.export`, `$.flow.delay/suspend`, `$.respond`, or `$.service.db`
+
+If the user is migrating workflows OFF Pipedream onto the self-hosted automation-platform, fall through to that project's own porter (`scripts/migrate-workflow.js` in `automation-platform/`); this skill is for staying inside Pipedream.
+
+## On-disk shape (mirrors `scripts/refresh-exports.mjs` output)
+
+```
+exported_workflows/<Project>/<WorkflowName>/
+  workflow_definition.json    ← full API payload (triggers, steps, props, secrets)
+  <stepName>.js               ← node code-cell steps
+  <stepName>.py               ← python code-cell steps
+  <stepName>_action.json      ← prebuilt component steps (no inline code)
+```
+
+**Rules when generating files:**
+1. One step ⇒ one file. File basename = step's `namespace` (preferred) or `name`.
+2. `workflow_definition.json` is the source of truth for ordering, props, secrets, and trigger config — code files are reconstructions of `step.savedComponent.code`.
+3. Sanitise step names with `[<>:"/\\|?*]` → `-` and whitespace → `_`.
+
+## Step contract — Node (the 95% case)
+
+```js
+export default defineComponent({
+  // OPTIONAL: typed props the step needs (auth, user input, upstream data)
+  props: {
+    notion: { type: "app", app: "notion" },                    // connected account
+    databaseId: { type: "string", label: "Notion database id" },
+    rowsPerPage: { type: "integer", default: 50, optional: true },
+  },
+  // run() receives:
+  //   steps : map of prior steps' return values, indexed by step name
+  //   $     : the Pipedream helper (see below)
+  async run({ steps, $ }) {
+    const upstream = steps.retrieveTeamMember.$return_value;     // chain pattern
+    // ...
+    return { ok: true, data };                                   // becomes $return_value
+  },
+});
+```
+
+### `$` helper — what's actually available
+
+| API | Purpose |
+|---|---|
+| `$.export(key, value)` | Attach a labelled value to the run timeline (visible in Pipedream UI logs). NOT the same as `return`. |
+| `$.respond({status, headers, body})` | For HTTP-trigger workflows: send the HTTP response. Required when the trigger is `HttpInterface` and you want to control the response. |
+| `$.flow.exit("reason")` | Terminate the workflow run early (success). |
+| `$.flow.delay(ms)` | Pause and resume after `ms`. Returns a sentinel — **do not** `return` the result; just call it. |
+| `$.flow.suspend({timeout})` then later `$.flow.resume(callbackId, payload)` | Long-running waits keyed by callback id. |
+| `$.service.db.get/set(key)` | Per-workflow KV store (string-keyed JSON). Survives between runs. Fast. |
+| `$.send.http({...})`, `$.send.email({...})`, `$.send.sse(...)` | Pipedream-managed delivery primitives. Prefer official SDKs (axios/googleapis) for non-Pipedream destinations. |
+
+### Trigger types (in `workflow_definition.json` `triggers[].type`)
+
+| `type` | When to use | Notes |
+|---|---|---|
+| `HttpInterface` | Inbound webhook | Pipedream gives the URL. Use `$.respond` to shape the response. |
+| `Timer` | Cron / interval | `triggers[0].cron_string` or `triggers[0].interval_seconds`. |
+| `EventSource` | Component-keyed event stream (Slack message, new Notion page, etc.) | `triggers[0].savedComponent.key` (e.g. `slack-new-message-in-channels`). |
+| `Email` | Inbound email-to-workflow | Generates a unique `*@pipedream.net` address. |
+
+A workflow has exactly one trigger. To "fan in" multiple triggers, build N workflows that share a common downstream workflow via HTTP.
+
+## Common patterns from this codebase
+
+These are taken from real workflows under `./exported_workflows/`. Match this style when scaffolding new ones.
+
+### Pattern: Notion query → conditional → action
+
+```js
+// retrieveTeamMember.js
+export default defineComponent({
+  props: { notion: { type: "app", app: "notion" } },
+  async run({ steps, $ }) {
+    const rows = steps.retrieveTeamMemberDatabaseRecords.$return_value.results;
+    const match = rows.find((r) => r.properties.email?.email === steps.trigger.event.body.email);
+    if (!match) return $.flow.exit("no matching team member");
+    return {
+      userName: match.properties.name.title[0].plain_text,
+      managerEmail: match.properties.manager.people[0]?.person.email,
+    };
+  },
+});
+```
+
+### Pattern: build payload for a downstream prebuilt action
+
+```js
+// buildEmailContent.js  (output consumed by sendEmailToEmployee_action.json)
+export default defineComponent({
+  async run({ steps, $ }) {
+    return {
+      emailSubject: `Your request was submitted`,
+      emailBody: `<html>…${steps.retrieveTeamMember.$return_value.userName}…</html>`,
+    };
+  },
+});
+```
+
+The matching `sendEmailToEmployee_action.json` references this via:
+
+```json
+{
+  "savedComponent": { "key": "gmail-send-email" },
+  "configuredProps": {
+    "gmail": "$auths.gmail",
+    "to": "{{steps.trigger.event.body.email}}",
+    "subject": "{{steps.buildEmailContent.$return_value.emailSubject}}",
+    "bodyHtml": "{{steps.buildEmailContent.$return_value.emailBody}}"
+  }
+}
+```
+
+### Pattern: HTTP trigger that responds synchronously
+
+```js
+async run({ steps, $ }) {
+  // ...do work...
+  await $.respond({ status: 200, body: { ok: true, ref: result.id } });
+}
+```
+
+### Pattern: idempotency for retried polling
+
+```js
+async run({ steps, $ }) {
+  const seen = (await $.service.db.get("seen_ids")) || [];
+  const fresh = items.filter((i) => !seen.includes(i.id));
+  if (!fresh.length) return $.flow.exit("nothing new");
+  await $.service.db.set("seen_ids", [...seen.slice(-500), ...fresh.map((i) => i.id)]);
+  return { fresh };
+}
+```
+
+## Scaffolding a NEW workflow
+
+Use the project's helper:
+
+```bash
+npm run create \
+  --project Notion \
+  --name SyncMonthlyChangelog \
+  --trigger timer --cron "0 9 * * 1" \
+  --steps fetchChangelog,formatPage,createNotionPage
+```
+
+This writes:
+```
+exported_workflows/Notion/SyncMonthlyChangelog/
+  workflow_definition.json   ← skeleton with the right trigger + step list
+  fetchChangelog.js          ← defineComponent stub
+  formatPage.js
+  createNotionPage.js
+```
+
+Then deploy it with one of:
+
+- **Hands-on (recommended):** open Pipedream UI, "Import from JSON", paste `workflow_definition.json`, paste each step's code. Pipedream provisions the trigger URL / cron registration.
+- **Hands-off (API):** `npm run create --deploy …` (calls `POST /v1/workflows` against the workspace). Best for templated bulk creation; the API path is documented inline in the script.
+- **Components only:** if a piece of logic is reusable across workflows, publish it as a Pipedream component first (`pd publish ./components/foo.mjs`) and reference its key from `workflow_definition.json`.
+
+## Authoring checklist (run mentally before declaring done)
+
+- [ ] Exactly **one** entry in `triggers[]` and its `type` is set.
+- [ ] Every step has a unique `name`/`namespace` (matches the basename of its `.js` file).
+- [ ] `defineComponent({ props, run })` is the default export of every code-cell.
+- [ ] `props` declares EVERY external dependency the step uses (`{type:"app",app:"..."}` for OAuth; typed props for user input). No bare environment access.
+- [ ] No `console.log` left in production-style steps — use `$.export("debug", …)` instead so logs are searchable.
+- [ ] HTTP-trigger workflows call `$.respond(...)` exactly once OR rely on Pipedream's default 200 (don't mix).
+- [ ] Polling/cron steps are idempotent (use `$.service.db` cursors).
+- [ ] If migrating OFF Pipedream eventually: list the `$.flow.*` and `$.send.*` calls used — they're the surface area the self-host runtime needs to emulate.
+
+## Don't
+
+- Don't import `axios` from a relative path — Pipedream provides it globally; just `import axios from "axios"` works in code-cells.
+- Don't `process.exit()` — use `$.flow.exit()`.
+- Don't pass secrets via props' `default` — use `{type:"app",app:"..."}` and connect the account in the UI (or, when deploying via API, reference an existing connected-account id).
+- Don't return Promises from `run()` without `await` — the run finishes before the promise resolves and you'll lose state.
+
+## References
+
+- Refresher: `scripts/refresh-exports.mjs` (`npm run refresh`)
+- Scaffolder: `scripts/create-workflow.mjs` (`npm run create`)
+- Local exports (after first refresh): `./exported_workflows/<Project>/<Workflow>/`
+- Pipedream component spec: https://pipedream.com/docs/components/api
+- API ref: https://pipedream.com/docs/rest-api
