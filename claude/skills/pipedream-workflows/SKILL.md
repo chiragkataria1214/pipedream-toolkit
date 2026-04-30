@@ -163,14 +163,9 @@ async run({ steps, $ }) {
 3.  **Fill in the logic** for the generated `.js` stubs using the `defineComponent` contract described above.
 
 **Deploying:**
-- **Manual (Recommended):** Instruct the user to open Pipedream UI, "Import from JSON", and paste `workflow_definition.json`.
-- **Automated (API):** **YOU (the AI) must ask the user for a Pipedream workflow link** (e.g. `https://pipedream.com/.../p_xxx/build`). Once provided:
-    1.  Extract the workflow ID (`p_xxx`) from the URL.
-    2.  Run the `create` script with the `--workflow <id>` and `--deploy` flags:
-        ```bash
-        npm run create -- --project <P> --name <N> --steps <S> --workflow <id> --deploy
-        ```
-    *Example Target:* `https://pipedream.com/@andrew-5ae2d1/projects/proj_zNsEgXx/untitled-workflow-30-04-2026-20-52-p_D1CdARV/build`
+- **Manual (Highly Recommended):** Open Pipedream UI, click **"New workflow"**, then **⋯ → "Import from JSON"**.
+- **The "Rich" JSON:** The `create` script generates a `workflow_definition.json` that includes your code steps inline (in `savedComponent.code`). Pasting this into the Pipedream UI will populate the entire workflow structure AND the code in one go.
+- **Automated (Metadata Only):** Running `npm run create --deploy` will only sync metadata (name, settings) via the API. Triggers and steps will appear EMPTY in the UI until you use the **Import from JSON** path.
 
 ## Authoring checklist (run mentally before declaring done)
 

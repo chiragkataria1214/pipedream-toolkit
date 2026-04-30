@@ -135,15 +135,23 @@ Once the workflow is created locally, you have two ways to push it to Pipedream:
 3. Paste the contents of `workflow_definition.json` (found in the new workflow folder).
 4. Pipedream provisions the trigger and you can then paste your `.js` code into the cells.
 
-### Method B: Automated Push (API)
-Ask Cursor to deploy it for you:
-> "Deploy this workflow to Pipedream."
-
-The AI will ask you for the **Pipedream workflow link** (e.g., from your browser). Once you provide it, the AI will extract the ID and run the deployment script for you.
+### Method B: Automated Push (API) - Metadata Only
+You can run `npm run create ... --deploy` to sync workflow metadata (name, etc.), but **triggers and steps will be EMPTY**. The Pipedream public API does not support updating workflow content.
 
 ---
 
-## 9. Day-to-day
+## 9. The "Rich" JSON Import
+
+To deploy your logic, the `create` script now generates a "rich" `workflow_definition.json` that includes your code inline.
+
+1.  Open Pipedream UI → **New workflow**
+2.  Click the `⋯` menu → **Import from JSON**
+3.  Paste the contents of `exported_workflows/.../workflow_definition.json`.
+4.  Everything (structure + code) will be populated instantly.
+
+---
+
+## 10. Day-to-day
 
 | Situation | Command |
 |---|---|

@@ -80,8 +80,8 @@ const FIRST_STEP_TEMPLATE = (stepName, isFirst, trigger) => {
     const triggerHint = isFirst && trigger === "http"
         ? `    // Trigger payload: steps.trigger.event.body / .headers / .query`
         : isFirst && trigger === "timer"
-        ? `    // Trigger fires on cron: ${CRON}. steps.trigger.event has the timestamp.`
-        : `    // Upstream output: steps.<previousStep>.$return_value`;
+            ? `    // Trigger fires on cron: ${CRON}. steps.trigger.event has the timestamp.`
+            : `    // Upstream output: steps.<previousStep>.$return_value`;
     return `export default defineComponent({
   // Declare every external dependency this step needs as a prop.
   // Examples:
@@ -111,7 +111,9 @@ const buildDefinition = () => {
             type: "CodeCell",
             lang: "nodejs20.x",
             order: i,
-            // savedComponent.code is filled in at deploy time from the .js file.
+            savedComponent: {
+                code: "" // Filled in by scaffold()
+            }
         })),
         // Free-form metadata so we know how this was generated.
         _generated: {
@@ -134,10 +136,6 @@ async function scaffold() {
     }
 
     const def = buildDefinition();
-    await fs.writeFile(
-        path.join(projDir, "workflow_definition.json"),
-        JSON.stringify(def, null, 2)
-    );
     for (let i = 0; i < STEPS.length; i++) {
         const filePath = path.join(projDir, `${STEPS[i]}.js`);
         if (!(await exists(filePath)) || FORCE) {
@@ -146,6 +144,22 @@ async function scaffold() {
             console.log(`  - Skipping ${STEPS[i]}.js (already exists)`);
         }
     }
+
+    // Refresh the definition with the actual code from disk (for "rich" import)
+    const richSteps = await Promise.all(
+        def.steps.map(async (s) => ({
+            ...s,
+            savedComponent: {
+                code: await fs.readFile(path.join(projDir, `${s.name}.js`), "utf8")
+            }
+        }))
+    );
+    def.steps = richSteps;
+
+    await fs.writeFile(
+        path.join(projDir, "workflow_definition.json"),
+        JSON.stringify(def, null, 2)
+    );
 
     console.log(`✓ Scaffolded ${projDir}`);
     console.log(`  ${STEPS.length} step(s): ${STEPS.join(", ")}`);
@@ -196,6 +210,10 @@ async function deploy(def) {
         workflow: { name: def.name, triggers: def.triggers, steps: stepsWithCode },
     };
 
+    console.log("\n⚠️  WARNING: The Pipedream public REST API is currently read-only for workflow content.");
+    console.log("   The --deploy flag will create/update the workflow metadata, but triggers and");
+    console.log("   steps will be EMPTY in the UI. You MUST use 'Import from JSON' to populate them.");
+    
     console.log(`\n⬆️  Deploying to Pipedream${WORKFLOW_ID ? ` (updating ${WORKFLOW_ID})` : ""}…`);
     try {
         let r;
