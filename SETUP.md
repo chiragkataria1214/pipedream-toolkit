@@ -40,7 +40,7 @@ You need two things:
 
 ### c) (Optional) Project id
 
-Only needed if you want `npm run create -- --deploy` to drop new workflows into a specific project rather than the workspace's default. Find it by opening any project in the UI and copying the `proj_xxxxxx` from the URL.
+Only needed if you want `npm run refresh -- --project proj_xxx` to scope refreshes to a single Pipedream project. Find it by opening any project in the UI and copying the `proj_xxxxxx` from the URL.
 
 ---
 
@@ -125,33 +125,26 @@ The AI will:
 
 ---
 
-## 8. Deployment
+## 8. Get the workflow into Pipedream (manual)
 
-Once the workflow is created locally, you have two ways to push it to Pipedream:
+The Pipedream public REST API can create empty workflow shells but **cannot populate triggers, steps, or code**, and there is no "Import from JSON" UI feature. So the last mile is manual — you build the workflow once in the UI and paste each generated `.js` file into a code cell. The `npm run create` output prints the exact sequence for the workflow you just scaffolded; this is the general shape:
 
-### Method A: Manual Import (Recommended for fine-tuning)
-1. Open Pipedream UI → **New workflow**
-2. Click the `⋯` menu → **Import from JSON**
-3. Paste the contents of `workflow_definition.json` (found in the new workflow folder).
-4. Pipedream provisions the trigger and you can then paste your `.js` code into the cells.
+1. Open https://pipedream.com → pick the target project → **New workflow**.
+2. Add the trigger that matches `triggers[0].type` from `workflow_definition.json`:
+   - `HttpInterface` → **HTTP / Webhook Requests**
+   - `Timer` → **Schedule** (paste the `cron_string` or set the interval)
+   - `Email` → **Email**
+   - `EventSource` → pick the matching component (e.g. `slack-new-message-in-channels`)
+3. For each step in `steps[]` (in `order`), click `+` → **Run custom code** (Node.js), name the cell to match the step's `namespace`, then **copy-paste the contents of `<stepName>.js`** into the editor.
+   - Prebuilt action steps appear as `<step>_action.json` instead of `.js` — pick the matching component from the action picker and copy the `configuredProps` field-by-field.
+4. Connect any apps the steps reference in `props` (e.g. `{ type: "app", app: "notion" }` → connect the Notion account when prompted).
+5. Click **Deploy** in the workflow editor.
 
-### Method B: Automated Push (API) - Metadata Only
-You can run `npm run create ... --deploy` to sync workflow metadata (name, etc.), but **triggers and steps will be EMPTY**. The Pipedream public API does not support updating workflow content.
-
----
-
-## 9. The "Rich" JSON Import
-
-To deploy your logic, the `create` script now generates a "rich" `workflow_definition.json` that includes your code inline.
-
-1.  Open Pipedream UI → **New workflow**
-2.  Click the `⋯` menu → **Import from JSON**
-3.  Paste the contents of `exported_workflows/.../workflow_definition.json`.
-4.  Everything (structure + code) will be populated instantly.
+> **Cloning the same workflow many times.** Once a workflow is built once, you can use Pipedream's share-link feature for repeated deploys: open it → `⋯` menu → **Create Share Link** → copy the `tch_xxx` id. Future copies become one API call: `POST /v1/workflows` with `{ project_id, org_id, template_id: "tch_xxx", settings: { name } }`. This path is not built into the toolkit yet.
 
 ---
 
-## 10. Day-to-day
+## 9. Day-to-day
 
 | Situation | Command |
 |---|---|
@@ -159,7 +152,7 @@ To deploy your logic, the `create` script now generates a "rich" `workflow_defin
 | Only refreshed yesterday, fast incremental | `npm run refresh -- --since $(date -v -1d +%Y-%m-%d)` |
 | Pull a single workflow you're touching right now | `npm run refresh -- --workflow p_abc123` |
 | New workflow, AI-assisted | Ask Cursor: "Create a new workflow..." |
-| Edit existing workflow code | Edit the `.js` file in `exported_workflows/<Project>/<Name>/`, then either paste back into Pipedream UI or wait for an automated push (TODO — not built yet) |
+| Edit existing workflow code | Edit the `.js` file in `exported_workflows/<Project>/<Name>/`, then paste back into the matching code cell in the Pipedream UI and click Deploy. |
 
 ---
 
@@ -178,7 +171,8 @@ cp claude/skills/pipedream-workflows/SKILL.md ~/.claude/skills/pipedream-workflo
 
 ## What's NOT in this toolkit (yet)
 
-- A "push edits" command — currently you re-paste `.js` changes into Pipedream UI. Coming soon.
+- An automated push for new workflows — there is no public Pipedream API path that can populate workflow content (triggers, steps, code), so first-time deploy is always a UI paste. A `--from-share-link tch_xxx` flag for cloning *existing* templates via the API is plausible and not yet built.
+- A "push edits" command for code-only changes — currently you copy the edited `.js` into the matching code cell in the UI and re-deploy.
 - Tests — no harness yet.
 - Linting — workflows aren't run through ESLint. Pipedream tolerates a wide range of styles.
 

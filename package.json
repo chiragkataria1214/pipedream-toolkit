@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Laptop-only toolkit for Pipedream workflows: refresh local exports, scaffold new workflows, and deploy via API. Works with Cursor (.cursor/rules) and Claude Code (claude/skills).",
+  "description": "Laptop-only toolkit for Pipedream workflows: refresh local exports and scaffold new workflows on disk. Pushing back into Pipedream is a manual UI paste — the public REST API can't populate workflow content. Works with Cursor (.cursor/rules) and Claude Code (claude/skills).",
   "engines": {
     "node": ">=18"
   },

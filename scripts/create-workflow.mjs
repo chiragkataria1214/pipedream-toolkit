@@ -1,21 +1,22 @@
 #!/usr/bin/env node
 /**
- * create_workflow.js — scaffold a new Pipedream workflow on disk and
- * (optionally) deploy it to the workspace via the REST API.
+ * create-workflow.mjs — scaffold a new Pipedream workflow on disk.
+ *
+ * This script ONLY creates local files. Pipedream's public REST API does
+ * not let you populate a workflow's triggers/steps/code, so the deploy
+ * step is manual: you build the workflow once in the Pipedream UI and
+ * paste the generated .js bodies into the code cells.
  *
  * Usage:
- *   node create_workflow.js \
+ *   node scripts/create-workflow.mjs \
  *     --project Notion \
  *     --name SyncMonthlyChangelog \
  *     --trigger timer --cron "0 9 * * 1" \
  *     --steps fetchChangelog,formatPage,createNotionPage
  *
  *   # HTTP-triggered:
- *   node create_workflow.js --project HR --name InboundResume --trigger http \
+ *   node scripts/create-workflow.mjs --project HR --name InboundResume --trigger http \
  *     --steps parseResume,scoreCandidate,notifySlack
- *
- *   # Push to Pipedream after scaffolding:
- *   node create_workflow.js ... --deploy
  *
  * Flags:
  *   --project   <string>    Top-level folder under exported_workflows/.
@@ -23,21 +24,16 @@
  *   --trigger   timer|http  Trigger kind. Defaults to http.
  *   --cron      <string>    Required when --trigger=timer.
  *   --steps     <csv>       Comma-separated step names (declared in order).
- *   --deploy                POST the workflow to /v1/workflows in the workspace.
- *   --workflow  <id>        Optional: update an existing workflow instead of creating a new one.
  *   --base      <dir>       Output base dir (default: ./exported_workflows).
- *   --force                 Overwrite an existing workflow folder.
+ *   --force                 Overwrite existing step .js files (definition is
+ *                           always rewritten; .js files are preserved by default).
  *
- * Env (loaded from ./.env when --deploy is set):
- *   PIPEDREAM_API_KEY     — required for --deploy
- *   PIPEDREAM_ORG_ID      — required for --deploy (e.g. o_xxxxxx)
- *   PIPEDREAM_PROJECT_ID  — optional, falls back to the org's default project
- *   EXPORT_DIR            — optional, default: ./exported_workflows
+ * Env (loaded from ./.env if present):
+ *   EXPORT_DIR              Optional override for the output base dir.
  */
 import fs from "fs/promises";
 import path from "path";
 import dotenv from "dotenv";
-import axios from "axios";
 
 dotenv.config();
 
@@ -56,12 +52,10 @@ const TRIGGER = (flag("trigger") || "http").toLowerCase();
 const CRON = flag("cron");
 const STEPS = (flag("steps") || "").split(",").map((s) => s.trim()).filter(Boolean);
 const BASE = flag("base") || process.env.EXPORT_DIR || "exported_workflows";
-const DEPLOY = has("deploy");
-const WORKFLOW_ID = flag("workflow");
 const FORCE = has("force");
 
 if (!PROJECT || !NAME || !STEPS.length) {
-    console.error("usage: node create_workflow.js --project P --name N --steps a,b,c [--trigger http|timer --cron '* * * * *'] [--deploy]");
+    console.error("usage: node scripts/create-workflow.mjs --project P --name N --steps a,b,c [--trigger http|timer --cron '* * * * *'] [--force]");
     process.exit(2);
 }
 if (TRIGGER === "timer" && !CRON) {
@@ -111,13 +105,9 @@ const buildDefinition = () => {
             type: "CodeCell",
             lang: "nodejs20.x",
             order: i,
-            savedComponent: {
-                code: "" // Filled in by scaffold()
-            }
         })),
-        // Free-form metadata so we know how this was generated.
         _generated: {
-            tool: "create_workflow.js",
+            tool: "create-workflow.mjs",
             at: new Date().toISOString(),
             project: PROJECT,
         },
@@ -129,116 +119,43 @@ async function exists(p) {
 }
 
 async function scaffold() {
-    if (await exists(projDir)) {
-        console.log(`ℹ️  Directory ${projDir} already exists. Syncing definition and deploying…`);
-    } else {
-        await fs.mkdir(projDir, { recursive: true });
-    }
+    const dirExists = await exists(projDir);
+    if (!dirExists) await fs.mkdir(projDir, { recursive: true });
 
     const def = buildDefinition();
-    for (let i = 0; i < STEPS.length; i++) {
-        const filePath = path.join(projDir, `${STEPS[i]}.js`);
-        if (!(await exists(filePath)) || FORCE) {
-            await fs.writeFile(filePath, FIRST_STEP_TEMPLATE(STEPS[i], i === 0, TRIGGER));
-        } else {
-            console.log(`  - Skipping ${STEPS[i]}.js (already exists)`);
-        }
-    }
-
-    // Refresh the definition with the actual code from disk (for "rich" import)
-    const richSteps = await Promise.all(
-        def.steps.map(async (s) => ({
-            ...s,
-            savedComponent: {
-                code: await fs.readFile(path.join(projDir, `${s.name}.js`), "utf8")
-            }
-        }))
-    );
-    def.steps = richSteps;
-
     await fs.writeFile(
         path.join(projDir, "workflow_definition.json"),
         JSON.stringify(def, null, 2)
     );
 
-    console.log(`✓ Scaffolded ${projDir}`);
-    console.log(`  ${STEPS.length} step(s): ${STEPS.join(", ")}`);
-    console.log(`  trigger: ${TRIGGER}${TRIGGER === "timer" ? ` (cron: ${CRON})` : ""}`);
-    console.log("\nNext:");
-    console.log("  • Open the .js files and fill in props + logic.");
-    console.log("  • To push to Pipedream: re-run with --deploy.");
-    console.log("  • Or import workflow_definition.json via Pipedream UI → 'Import from JSON'.");
-    return def;
-}
-
-/**
- * Deploy the scaffold to Pipedream via REST API.
- *
- * The Pipedream workspace API exposes:
- *   POST /v1/workflows
- *     {
- *       "org_id": "<org>",
- *       "project_id": "<project>",
- *       "workflow": { name, triggers, steps: [{ name, lang, code, ... }] }
- *     }
- *
- * The exact shape isn't fully published — this is what the v1 export shape
- * round-trips. Treat 4xx responses as a hint to either:
- *   1. Use the UI's "Import from JSON" feature (paste workflow_definition.json), or
- *   2. Adjust the payload shape based on what Pipedream returns.
- */
-async function deploy(def) {
-    const API_KEY = process.env.PIPEDREAM_API_KEY;
-    const ORG_ID = process.env.PIPEDREAM_ORG_ID;
-    const PROJECT_ID = process.env.PIPEDREAM_PROJECT_ID || null;
-    if (!API_KEY || !ORG_ID) {
-        console.error("\nerror: --deploy requires PIPEDREAM_API_KEY and PIPEDREAM_ORG_ID in ./.env");
-        process.exit(1);
-    }
-
-    // Inline each step's source code into the definition.
-    const stepsWithCode = await Promise.all(
-        def.steps.map(async (s) => ({
-            ...s,
-            code_raw: await fs.readFile(path.join(projDir, `${s.name}.js`), "utf8"),
-        }))
-    );
-
-    const payload = {
-        org_id: ORG_ID,
-        ...(PROJECT_ID && { project_id: PROJECT_ID }),
-        workflow: { name: def.name, triggers: def.triggers, steps: stepsWithCode },
-    };
-
-    console.log("\n⚠️  WARNING: The Pipedream public REST API is currently read-only for workflow content.");
-    console.log("   The --deploy flag will create/update the workflow metadata, but triggers and");
-    console.log("   steps will be EMPTY in the UI. You MUST use 'Import from JSON' to populate them.");
-    
-    console.log(`\n⬆️  Deploying to Pipedream${WORKFLOW_ID ? ` (updating ${WORKFLOW_ID})` : ""}…`);
-    try {
-        let r;
-        if (WORKFLOW_ID) {
-            r = await axios.put(`https://api.pipedream.com/v1/workflows/${WORKFLOW_ID}?org_id=${ORG_ID}`, payload, {
-                headers: { Authorization: `Bearer ${API_KEY}` },
-            });
+    const written = [];
+    const skipped = [];
+    for (let i = 0; i < STEPS.length; i++) {
+        const filePath = path.join(projDir, `${STEPS[i]}.js`);
+        if (!(await exists(filePath)) || FORCE) {
+            await fs.writeFile(filePath, FIRST_STEP_TEMPLATE(STEPS[i], i === 0, TRIGGER));
+            written.push(STEPS[i]);
         } else {
-            r = await axios.post("https://api.pipedream.com/v1/workflows", payload, {
-                headers: { Authorization: `Bearer ${API_KEY}` },
-            });
+            skipped.push(STEPS[i]);
         }
-        const wf = r.data?.workflow || r.data;
-        console.log(`✓ ${WORKFLOW_ID ? "Updated" : "Created"} workflow ${wf.id || WORKFLOW_ID || "(no id returned)"}`);
-        if (wf.id || WORKFLOW_ID) console.log(`  https://pipedream.com/@/${wf.id || WORKFLOW_ID}`);
-    } catch (e) {
-        const status = e.response?.status;
-        const body = e.response?.data;
-        console.error(`✗ Deploy failed (HTTP ${status || "?"}):`);
-        console.error("  " + JSON.stringify(body || e.message));
-        console.error("\nFallback: open Pipedream UI → New workflow → ⋯ → Import from JSON");
-        console.error(`         and paste ${path.join(projDir, "workflow_definition.json")}`);
-        process.exit(1);
     }
+
+    console.log(`✓ ${dirExists ? "Updated" : "Scaffolded"} ${projDir}`);
+    console.log(`  trigger: ${TRIGGER}${TRIGGER === "timer" ? ` (cron: ${CRON})` : ""}`);
+    if (written.length) console.log(`  wrote .js stubs: ${written.join(", ")}`);
+    if (skipped.length) console.log(`  preserved (use --force to overwrite): ${skipped.join(", ")}`);
+
+    console.log("\nNext — open the .js files and fill in props + logic.");
+    console.log("\nThen, to get the workflow into Pipedream (manual; the public");
+    console.log("REST API can't populate workflow content):");
+    console.log("  1. Open https://pipedream.com → New workflow (in your project).");
+    console.log(`  2. Add a ${TRIGGER === "timer" ? "Schedule (Cron)" : "HTTP / Webhook"} trigger.`);
+    console.log("  3. For each step below, click '+' → 'Run custom code' (Node.js)");
+    console.log("     and copy-paste the contents of the matching file:");
+    for (const s of STEPS) {
+        console.log(`       • ${s}  ←  ${path.join(projDir, `${s}.js`)}`);
+    }
+    console.log("  4. Click Deploy in the Pipedream UI when done.");
 }
 
-const def = await scaffold();
-if (DEPLOY) await deploy(def);
+await scaffold();

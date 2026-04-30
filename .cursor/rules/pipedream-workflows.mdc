@@ -1,5 +1,5 @@
 ---
-description: Authoring guide for Pipedream workflows — on-disk shape, defineComponent contract, $ helper, trigger types, deploy paths. Auto-attached when editing files under exported_workflows/ or the scripts.
+description: Authoring guide for Pipedream workflows — on-disk shape, defineComponent contract, $ helper, trigger types, and the manual copy-paste flow into the Pipedream UI. Auto-attached when editing files under exported_workflows/ or the scripts.
 globs: exported_workflows/**/*.{js,mjs,py,json},scripts/{refresh-exports,create-workflow}.mjs
 alwaysApply: false
 ---
@@ -163,10 +163,19 @@ async run({ steps, $ }) {
 2.  **Inspect existing workflows** in `exported_workflows/` to match the coding style, prop naming, and error handling patterns of the project.
 3.  **Fill in the logic** for the generated `.js` stubs using the `defineComponent` contract described above.
 
-**Deploying:**
-- **Manual (Highly Recommended):** Open Pipedream UI, click **"New workflow"**, then **⋯ → "Import from JSON"**.
-- **The "Rich" JSON:** The `create` script generates a `workflow_definition.json` that includes your code steps inline (in `savedComponent.code`). Pasting this into the Pipedream UI will populate the entire workflow structure AND the code in one go.
-- **Automated (Metadata Only):** Running `npm run create --deploy` will only sync metadata (name, settings) via the API. Triggers and steps will appear EMPTY in the UI until you use the **Import from JSON** path.
+**Getting it into Pipedream (manual — there is no API path):**
+
+The Pipedream public REST API can create empty workflow shells but cannot populate triggers, steps, or code. There is also no "Import from JSON" UI feature. You — or the user — have to build the workflow once in the UI and paste each `.js` file's contents into a code cell.
+
+Walk the user through this exact sequence after you scaffold:
+
+1. Open https://pipedream.com → pick the target project → **New workflow**.
+2. Add a trigger that matches `triggers[0].type` from `workflow_definition.json` (e.g. **HTTP / Webhook** for `HttpInterface`, **Schedule** for `Timer`).
+3. For each entry in `steps[]` (in `order`), click `+` → **Run custom code** (Node.js), name the cell to match the step's `namespace`, then copy-paste the contents of `<stepName>.js` into the editor. For prebuilt action steps (`<step>_action.json`), pick the matching component (e.g. `slack-send-message-to-channel`) from the action picker and copy the `configuredProps` field-by-field.
+4. Connect any apps the steps reference in `props` (e.g. `{ type: "app", app: "notion" }` → connect the Notion account when prompted).
+5. Click **Deploy** in the workflow editor.
+
+Once the workflow is built once, future copies of the *same shape* can be cloned via the share-link path (`⋯ → Create Share Link` → `tch_xxx` → `POST /v1/workflows` with `template_id`). That's the only programmatic deploy that actually carries content.
 
 ## Authoring checklist (run mentally before declaring done)
 
@@ -183,7 +192,7 @@ async run({ steps, $ }) {
 
 - Don't import `axios` from a relative path — Pipedream provides it globally; just `import axios from "axios"` works in code-cells.
 - Don't `process.exit()` — use `$.flow.exit()`.
-- Don't pass secrets via props' `default` — use `{type:"app",app:"..."}` and connect the account in the UI (or, when deploying via API, reference an existing connected-account id).
+- Don't pass secrets via props' `default` — use `{type:"app",app:"..."}` and connect the account in the UI.
 - Don't return Promises from `run()` without `await` — the run finishes before the promise resolves and you'll lose state.
 
 ## References
